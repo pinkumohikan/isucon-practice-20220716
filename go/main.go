@@ -1204,7 +1204,8 @@ func getTrend(c echo.Context) error {
 			}
 			isuId = isuLastCon.IsuID
 
-			isuLastCon = IsuCondition{
+			isuLastCon = IsuAndLastCondition{
+				isuLastCon.IsuID,
 				isuLastCon.IsuConditionID,
 				isuLastCon.IsuConditionJIAIsuUUID,
 				isuLastCon.Timestamp,
@@ -1213,14 +1214,14 @@ func getTrend(c echo.Context) error {
 				isuLastCon.Message,
 				isuLastCon.IsuConditionCreatedAt,
 			}
-			conditionLevel, err := calculateConditionLevel(isuLastCondition.Condition)
+			conditionLevel, err := calculateConditionLevel(isuLastCon.Condition)
 			if err != nil {
 				c.Logger().Error(err)
 				return c.NoContent(http.StatusInternalServerError)
 			}
 			trendCondition := TrendCondition{
 				ID:        isuId,
-				Timestamp: isuLastCondition.Timestamp.Unix(),
+				Timestamp: isuLastCon.Timestamp.Unix(),
 			}
 			switch conditionLevel {
 			case "info":
@@ -1230,6 +1231,7 @@ func getTrend(c echo.Context) error {
 			case "critical":
 				characterCriticalIsuConditions = append(characterCriticalIsuConditions, &trendCondition)
 			}
+
 		}
 
 		sort.Slice(characterInfoIsuConditions, func(i, j int) bool {
