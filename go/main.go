@@ -34,7 +34,7 @@ const (
 	frontendContentsPath        = "../public"
 	jiaJWTSigningKeyPath        = "../ec256-public.pem"
 	defaultIconFilePath         = "../NoImage.jpg"
-	iconImagePath               = "../public/images/api/isu"
+	iconImagePath               = "../public/tmp"
 	defaultJIAServiceURL        = "http://localhost:5000"
 	mysqlErrNumDuplicateEntry   = 1062
 	conditionLevelInfo          = "info"
@@ -217,7 +217,7 @@ func init() {
 
 func main() {
 	e := echo.New()
-	e.Debug = true
+	e.Debug = false
 	e.Logger.SetLevel(log.DEBUG)
 
 	e.Use(middleware.Logger())
