@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"math/rand"
 	"net/http"
@@ -33,6 +34,7 @@ const (
 	frontendContentsPath        = "../public"
 	jiaJWTSigningKeyPath        = "../ec256-public.pem"
 	defaultIconFilePath         = "../NoImage.jpg"
+	iconImagePath               = "/home/isucon/tmp"
 	defaultJIAServiceURL        = "http://localhost:5000"
 	mysqlErrNumDuplicateEntry   = 1062
 	conditionLevelInfo          = "info"
@@ -51,6 +53,7 @@ var (
 	jiaJWTSigningKey *ecdsa.PublicKey
 
 	postIsuConditionTargetBaseURL string // JIAへのactivate時に登録する，ISUがconditionを送る先のURL
+	defaultIconBin                []byte
 )
 
 type Config struct {
@@ -59,14 +62,15 @@ type Config struct {
 }
 
 type Isu struct {
-	ID         int       `db:"id" json:"id"`
-	JIAIsuUUID string    `db:"jia_isu_uuid" json:"jia_isu_uuid"`
-	Name       string    `db:"name" json:"name"`
-	Image      []byte    `db:"image" json:"-"`
-	Character  string    `db:"character" json:"character"`
-	JIAUserID  string    `db:"jia_user_id" json:"-"`
-	CreatedAt  time.Time `db:"created_at" json:"-"`
-	UpdatedAt  time.Time `db:"updated_at" json:"-"`
+	ID              int       `db:"id" json:"id"`
+	JIAIsuUUID      string    `db:"jia_isu_uuid" json:"jia_isu_uuid"`
+	Name            string    `db:"name" json:"name"`
+	Image           []byte    `db:"image" json:"-"`
+	UseDefaultImage bool      `db:"use_default_image" json:"-"`
+	Character       string    `db:"character" json:"character"`
+	JIAUserID       string    `db:"jia_user_id" json:"-"`
+	CreatedAt       time.Time `db:"created_at" json:"-"`
+	UpdatedAt       time.Time `db:"updated_at" json:"-"`
 }
 
 type IsuFromJIA struct {
@@ -196,6 +200,11 @@ func (mc *MySQLConnectionEnv) ConnectDB() (*sqlx.DB, error) {
 
 func init() {
 	sessionStore = sessions.NewCookieStore([]byte(getEnv("SESSION_KEY", "isucondition")))
+	var err error
+	defaultIconBin, err = os.ReadFile(defaultIconFilePath)
+	if err != nil {
+		log.Fatalf("failed to load defaultIconFilePath: %v", err)
+	}
 
 	key, err := ioutil.ReadFile(jiaJWTSigningKeyPath)
 	if err != nil {
@@ -345,6 +354,58 @@ func postInitialize(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
+	// icon画像を消す
+	cmd = exec.Command("rm", "-f", iconImagePath+"/*")
+	err = cmd.Run()
+	if err != nil {
+		c.Logger().Errorf("exec rm images error: %v", err)
+		return c.NoContent(http.StatusInternalServerError)
+	}
+
+	// 画像を作っていく
+	rows, err := db.Queryx("SELECT  jia_isu_uuid, image from isu")
+	if err != nil {
+		c.Logger().Errorf("exec select isu error: %v", err)
+		return c.NoContent(http.StatusInternalServerError)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var isu Isu
+		rows.StructScan(&isu)
+		filename := fmt.Sprintf("%s/%s.jpg", iconImagePath, isu.JIAIsuUUID)
+		out, err := os.Create(filename)
+		if err != nil {
+			c.Logger().Error(err)
+			return c.NoContent(http.StatusInternalServerError)
+		}
+		_, err = out.Write(isu.Image)
+		if err != nil {
+			c.Logger().Error(err)
+			return c.NoContent(http.StatusInternalServerError)
+		}
+		out.Close()
+	}
+	// デフォルト画像も移す
+	cmd = exec.Command("cp", defaultIconFilePath, "/home/isucon/tmp/NoImage.jpg")
+	err = cmd.Run()
+	if err != nil {
+		c.Logger().Errorf("exec rm images error: %v", err)
+		return c.NoContent(http.StatusInternalServerError)
+	}
+
+	_, err = db.Exec("ALTER TABLE isu ADD COLUMN use_default_image BOOLEAN NOT NULL DEFAULT FALSE")
+	if err != nil {
+		c.Logger().Error(err)
+		return c.NoContent(http.StatusInternalServerError)
+	}
+
+	_, err = db.Exec("UPDATE isu set image = ''")
+	if err != nil {
+		c.Logger().Error(err)
+		return c.NoContent(http.StatusInternalServerError)
+	}
+	c.Response().Header().Set(echo.HeaderContentType, echo.MIMEApplicationJSONCharsetUTF8)
+	c.Response().WriteHeader(http.StatusOK)
 	return c.JSON(http.StatusOK, InitializeResponse{
 		Language: "go",
 	})
@@ -560,15 +621,7 @@ func postIsu(c echo.Context) error {
 		useDefaultImage = true
 	}
 
-	var image []byte
-
-	if useDefaultImage {
-		image, err = ioutil.ReadFile(defaultIconFilePath)
-		if err != nil {
-			c.Logger().Error(err)
-			return c.NoContent(http.StatusInternalServerError)
-		}
-	} else {
+	if !useDefaultImage {
 		file, err := fh.Open()
 		if err != nil {
 			c.Logger().Error(err)
@@ -576,11 +629,18 @@ func postIsu(c echo.Context) error {
 		}
 		defer file.Close()
 
-		image, err = ioutil.ReadAll(file)
+		filename := fmt.Sprintf("%s/%s.jpg", iconImagePath, jiaIsuUUID)
+		out, err := os.Create(filename)
 		if err != nil {
 			c.Logger().Error(err)
 			return c.NoContent(http.StatusInternalServerError)
 		}
+		_, err = io.Copy(out, file)
+		if err != nil {
+			c.Logger().Error(err)
+			return c.NoContent(http.StatusInternalServerError)
+		}
+		out.Close()
 	}
 
 	tx, err := db.Beginx()
@@ -591,8 +651,8 @@ func postIsu(c echo.Context) error {
 	defer tx.Rollback()
 
 	_, err = tx.Exec("INSERT INTO `isu`"+
-		"	(`jia_isu_uuid`, `name`, `image`, `jia_user_id`) VALUES (?, ?, ?, ?)",
-		jiaIsuUUID, isuName, image, jiaUserID)
+		"	(`jia_isu_uuid`, `name`, `use_default_image`, `jia_user_id`) VALUES (?, ?, ?, ?)",
+		jiaIsuUUID, isuName, useDefaultImage, jiaUserID)
 	if err != nil {
 		mysqlErr, ok := err.(*mysql.MySQLError)
 
@@ -696,7 +756,9 @@ func getIsuID(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	return c.JSON(http.StatusOK, res)
+	c.Response().Header().Set(echo.HeaderContentType, echo.MIMEApplicationJSONCharsetUTF8)
+	c.Response().WriteHeader(http.StatusOK)
+	return json.NewEncoder(c.Response()).Encode(res)
 }
 
 // GET /api/isu/:jia_isu_uuid/icon
@@ -714,8 +776,8 @@ func getIsuIcon(c echo.Context) error {
 
 	jiaIsuUUID := c.Param("jia_isu_uuid")
 
-	var image []byte
-	err = db.Get(&image, "SELECT `image` FROM `isu` WHERE `jia_user_id` = ? AND `jia_isu_uuid` = ?",
+	var useDefaultImage bool
+	err = db.Get(&useDefaultImage, "SELECT `use_default_image` FROM `isu` WHERE `jia_user_id` = ? AND `jia_isu_uuid` = ?",
 		jiaUserID, jiaIsuUUID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -726,7 +788,14 @@ func getIsuIcon(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	return c.Blob(http.StatusOK, "", image)
+	var filename string
+	if !useDefaultImage {
+		filename = fmt.Sprintf("/icon/%s.jpg", jiaIsuUUID)
+	} else {
+		filename = "/icon/NoImage.jpg"
+	}
+	c.Response().Header().Set("X-Accel-Redirect", filename)
+	return c.File(filename)
 }
 
 // GET /api/isu/:jia_isu_uuid/graph
@@ -794,7 +863,10 @@ func generateIsuGraphResponse(tx *sqlx.Tx, jiaIsuUUID string, graphDate time.Tim
 	var startTimeInThisHour time.Time
 	var condition IsuCondition
 
-	rows, err := tx.Queryx("SELECT * FROM `isu_condition` WHERE `jia_isu_uuid` = ? ORDER BY `timestamp` ASC", jiaIsuUUID)
+	rows, err := tx.Queryx("SELECT * FROM `isu_condition` WHERE `jia_isu_uuid` = ? AND `timestamp` BETWEEN ? AND ? ORDER BY `timestamp` ASC",
+		jiaIsuUUID,
+		graphDate.Format("2006-01-02")+" 00:00:00",
+		graphDate.Format("2006-01-02")+" 23:59:59")
 	if err != nil {
 		return nil, fmt.Errorf("db error: %v", err)
 	}
