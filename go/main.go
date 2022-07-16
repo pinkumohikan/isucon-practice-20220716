@@ -399,6 +399,11 @@ func postInitialize(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
+	_, err = db.Exec("UPDATE isu set image = ''")
+	if err != nil {
+		c.Logger().Error(err)
+		return c.NoContent(http.StatusInternalServerError)
+	}
 	c.Response().Header().Set(echo.HeaderContentType, echo.MIMEApplicationJSONCharsetUTF8)
 	c.Response().WriteHeader(http.StatusOK)
 	return c.JSON(http.StatusOK, InitializeResponse{
