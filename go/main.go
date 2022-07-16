@@ -262,7 +262,7 @@ func main() {
 		for {
 			select {
 			case <-ticker.C:
-				go BulkInsertIsuCondition(100)
+				go BulkInsertIsuCondition(1000)
 			}
 		}
 	}()
