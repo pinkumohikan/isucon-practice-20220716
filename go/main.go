@@ -276,6 +276,19 @@ func main() {
 		}
 	}()
 
+	// trend cacheのpurge
+	go func() {
+		for {
+			ticker := time.NewTicker(time.Millisecond * 900)
+			select {
+			case <-ticker.C:
+				trendCacheMutex.Lock()
+				trendCache = []TrendResponse{}
+				trendCacheMutex.Unlock()
+			}
+		}
+	}()
+
 	serverPort := fmt.Sprintf(":%v", getEnv("SERVER_APP_PORT", "3000"))
 	e.Logger.Fatal(e.Start(serverPort))
 }
@@ -1160,6 +1173,11 @@ func calculateConditionLevel(condition string) (string, error) {
 	return conditionLevel, nil
 }
 
+var (
+	trendCache      = []TrendResponse{}
+	trendCacheMutex = sync.RWMutex{}
+)
+
 // GET /api/trend
 // ISUの性格毎の最新のコンディション情報
 func getTrend(c echo.Context) error {
@@ -1169,6 +1187,13 @@ func getTrend(c echo.Context) error {
 		c.Logger().Errorf("db error: %v", err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
+
+	trendCacheMutex.RLock()
+	if len(trendCache) != 0 {
+		defer trendCacheMutex.RUnlock()
+		return c.JSON(http.StatusOK, trendCache)
+	}
+	trendCacheMutex.RUnlock()
 
 	res := []TrendResponse{}
 
@@ -1238,6 +1263,10 @@ func getTrend(c echo.Context) error {
 				Critical:  characterCriticalIsuConditions,
 			})
 	}
+
+	trendCacheMutex.Lock()
+	trendCache = res
+	trendCacheMutex.Unlock()
 
 	return c.JSON(http.StatusOK, res)
 }
