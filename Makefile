@@ -25,7 +25,7 @@ bench:
 	cd ../bench && ./bench -all-addresses 127.0.0.11 -target 127.0.0.11:443 -tls -jia-service-url http://127.0.0.1:4999
 
 kataribe:
-	sudo cat /var/log/nginx/access.log | ./kataribe -conf kataribe.toml
+	sudo cat /var/log/nginx/access.log | ./kataribe -conf kataribe.toml | grep --after-context 20 "Top 20 Sort By Total"
 
 save-log: TS=$(shell date "+%Y%m%d_%H%M%S")
 save-log: 
