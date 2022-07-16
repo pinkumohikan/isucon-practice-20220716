@@ -1188,10 +1188,10 @@ func BulkInsertIsuCondition(bulkLimit int) {
 	if len(isuConditionInsertQueue) > 0 {
 		limit := bulkLimit
 		if len(isuConditionInsertQueue) < bulkLimit {
-			limit = len(isuConditionInsertQueue) - 1
+			limit = len(isuConditionInsertQueue)
 		}
 		isuConditionInsertQueueMutex.Lock()
-		records := isuConditionInsertQueue[0:limit]
+		records := isuConditionInsertQueue[:limit]
 		isuConditionInsertQueue = isuConditionInsertQueue[limit:]
 		isuConditionInsertQueueMutex.Unlock()
 
