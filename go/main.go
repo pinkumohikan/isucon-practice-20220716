@@ -787,7 +787,7 @@ func getIsuIcon(c echo.Context) error {
 	if !useDefaultImage {
 		filename = fmt.Sprintf("/icon/%s.jpg", jiaIsuUUID)
 	} else {
-		filename = iconImagePath + "/icon/NoImage.jpg"
+		filename = "/icon/NoImage.jpg"
 	}
 	c.Response().Header().Set("X-Accel-Redirect", filename)
 	return c.File(filename)
