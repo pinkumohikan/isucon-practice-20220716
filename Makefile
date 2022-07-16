@@ -8,12 +8,15 @@ build:
 stop-services:
 	sudo systemctl stop nginx
 	sudo systemctl stop isucondition.go
+	ssh isucon111q-03 "sudo systemctl stop isucondition.go"
 	ssh isucon111q-02 "sudo systemctl stop mysql"
 
 start-services:
 	ssh isucon111q-02 "sudo systemctl start mysql"
 	sleep 5
 	sudo systemctl start isucondition.go
+	scp ./go/isucondition isucon111q-03:/home/isucon/webapp/go/isucondition
+	ssh isucon111q-03 "sudo systemctl start isucondition.go"
 	sudo systemctl start nginx
 
 truncate-logs:
@@ -25,7 +28,7 @@ bench:
 	cd ../bench && ./bench -all-addresses 127.0.0.11 -target 127.0.0.11:443 -tls -jia-service-url http://127.0.0.1:4999
 
 kataribe:
-	sudo cat /var/log/nginx/access.log | ./kataribe -conf kataribe.toml
+	sudo cat /var/log/nginx/access.log | ./kataribe -conf kataribe.toml | grep --after-context 20 "Top 20 Sort By Total"
 
 save-log: TS=$(shell date "+%Y%m%d_%H%M%S")
 save-log: 
