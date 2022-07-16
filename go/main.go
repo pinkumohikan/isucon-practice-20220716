@@ -256,7 +256,16 @@ func main() {
 		return
 	}
 
-	go InsertIsuConditionWorker(100)
+	// bulk insert worker
+	go func() {
+		ticker := time.NewTicker(time.Millisecond * 500)
+		for {
+			select {
+			case <-ticker.C:
+				go BulkInsertIsuCondition(100)
+			}
+		}
+	}()
 
 	serverPort := fmt.Sprintf(":%v", getEnv("SERVER_APP_PORT", "3000"))
 	e.Logger.Fatal(e.Start(serverPort))
@@ -1173,43 +1182,37 @@ var (
 	isuConditionInsertQueueMutex = sync.RWMutex{}
 )
 
-func InsertIsuConditionWorker(bulkLimit int) {
-	const sleepInterval = time.Millisecond * 500
+func BulkInsertIsuCondition(bulkLimit int) {
+	log.Printf("BulkInsertIsuCondition(): remaining %d records", len(isuConditionInsertQueue))
 
-	for {
-		log.Printf("InsertIsuConditionWorker(): remaining %d records", len(isuConditionInsertQueue))
+	if len(isuConditionInsertQueue) > 0 {
+		limit := bulkLimit
+		if len(isuConditionInsertQueue) < bulkLimit {
+			limit = len(isuConditionInsertQueue) - 1
+		}
+		isuConditionInsertQueueMutex.Lock()
+		records := isuConditionInsertQueue[0:limit]
+		isuConditionInsertQueue = isuConditionInsertQueue[limit:]
+		isuConditionInsertQueueMutex.Unlock()
 
-		if len(isuConditionInsertQueue) > 0 {
-			limit := bulkLimit
-			if len(isuConditionInsertQueue) < bulkLimit {
-				limit = len(isuConditionInsertQueue) - 1
-			}
-			isuConditionInsertQueueMutex.Lock()
-			records := isuConditionInsertQueue[0:limit]
-			isuConditionInsertQueue = isuConditionInsertQueue[limit:]
-			isuConditionInsertQueueMutex.Unlock()
-
-			tx := db.MustBegin()
-			_, err := tx.NamedExec(
-				"INSERT INTO `isu_condition`"+
-					"	(`jia_isu_uuid`, `timestamp`, `is_sitting`, `condition`, `message`)"+
-					"	VALUES (:jia_isu_uuid, :timestamp, :is_sitting, :condition, :message)",
-				records)
-			if err != nil {
-				tx.Rollback()
-				log.Print("ERROR", err)
-				break
-			}
-			if err := tx.Commit(); err != nil {
-				tx.Rollback()
-				log.Print("ERROR", err)
-				break
-			}
-
-			log.Printf("InsertIsuConditionWorker(): proceeded %d records", len(records))
+		tx := db.MustBegin()
+		_, err := tx.NamedExec(
+			"INSERT INTO `isu_condition`"+
+				"	(`jia_isu_uuid`, `timestamp`, `is_sitting`, `condition`, `message`)"+
+				"	VALUES (:jia_isu_uuid, :timestamp, :is_sitting, :condition, :message)",
+			records)
+		if err != nil {
+			tx.Rollback()
+			log.Print("ERROR", err)
+			return
+		}
+		if err := tx.Commit(); err != nil {
+			tx.Rollback()
+			log.Print("ERROR", err)
+			return
 		}
 
-		time.Sleep(sleepInterval)
+		log.Printf("BulkInsertIsuCondition(): proceeded %d records", len(records))
 	}
 }
 
