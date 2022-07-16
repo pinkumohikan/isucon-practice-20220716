@@ -777,7 +777,7 @@ func getIsuIcon(c echo.Context) error {
 	}
 
 	var filename string
-	if len(image) >= 0 {
+	if len(image) > 0 {
 		filename = fmt.Sprintf("/icon/%s.jpg", jiaIsuUUID)
 	} else {
 		filename = iconImagePath + "/icon/NoImage.jpg"
