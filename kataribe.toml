@@ -96,12 +96,16 @@ regexp = 'GET /api/condition/[a-z0-9-]+'
 name = 'GET /api/condition/[a-z0-9-]+'
 
 [[bundle]]
-regexp = 'GET /api/isu/[a-z0-9-]+'
-name = 'GET /api/isu/[a-z0-9-]+'
-
-[[bundle]]
 regexp = 'GET /isu/[a-z0-9-]+/condition'
 name = 'GET /isu/[a-z0-9-]+/condition'
+
+[[bundle]]
+regexp = 'GET /api/isu/[a-z0-9-]+/graph.*'
+name = 'GET /api/isu/[a-z0-9-]+/graph'
+
+[[bundle]]
+regexp = 'GET /api/isu/[a-z0-9-]+'
+name = 'GET /api/isu/[a-z0-9-]+'
 
 [[bundle]]
 regexp = 'GET /isu/[a-z0-9-]+/graph'
