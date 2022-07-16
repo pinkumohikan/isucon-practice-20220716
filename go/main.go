@@ -1195,8 +1195,8 @@ func getTrend(c echo.Context) error {
 		characterWarningIsuConditions := []*TrendCondition{}
 		characterCriticalIsuConditions := []*TrendCondition{}
 		for rows.Next() {
-			var isuLastCon IsuAndLastCondition
 			var isuId int
+			var isuLastCon IsuAndLastCondition
 			err = rows.StructScan(&isuLastCon)
 			if err != nil {
 				c.Logger().Errorf("db error: %v", err)
@@ -1204,7 +1204,7 @@ func getTrend(c echo.Context) error {
 			}
 			isuId = isuLastCon.IsuID
 
-			isuLastCondition := IsuCondition{
+			isuLastCon = IsuCondition{
 				isuLastCon.IsuConditionID,
 				isuLastCon.IsuConditionJIAIsuUUID,
 				isuLastCon.Timestamp,
