@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"math/rand"
 	"net/http"
 	"os"
 	"os/exec"
@@ -1216,15 +1215,20 @@ func BulkInsertIsuCondition(bulkLimit int) {
 	}
 }
 
+var (
+	latestIsuConditionMap      = map[string]string{}
+	latestIsuConditionMapMutex = sync.RWMutex{}
+)
+
 // POST /api/condition/:jia_isu_uuid
 // ISUからのコンディションを受け取る
 func postIsuCondition(c echo.Context) error {
 	// TODO: 一定割合リクエストを落としてしのぐようにしたが、本来は全量さばけるようにすべき
-	dropProbability := 0.9
-	if rand.Float64() <= dropProbability {
-		c.Logger().Warnf("drop post isu condition request")
-		return c.NoContent(http.StatusAccepted)
-	}
+	//dropProbability := 0.9
+	//if rand.Float64() <= dropProbability {
+	//	c.Logger().Warnf("drop post isu condition request")
+	//	return c.NoContent(http.StatusAccepted)
+	//}
 
 	jiaIsuUUID := c.Param("jia_isu_uuid")
 	if jiaIsuUUID == "" {
@@ -1256,15 +1260,26 @@ func postIsuCondition(c echo.Context) error {
 			return c.String(http.StatusBadRequest, "bad request body")
 		}
 
-		isuConditionInsertQueueMutex.Lock()
-		isuConditionInsertQueue = append(isuConditionInsertQueue, IsuConditionInsertJob{
-			JiaIsuUUID: jiaIsuUUID,
-			Timestamp:  timestamp,
-			IsSitting:  cond.IsSitting,
-			Condition:  cond.Condition,
-			Message:    cond.Message,
-		})
-		isuConditionInsertQueueMutex.Unlock()
+		latestIsuConditionMapMutex.RLock()
+		c := latestIsuConditionMap[jiaIsuUUID]
+		latestIsuConditionMapMutex.RUnlock()
+
+		if c == cond.Condition {
+			// コンディション変わってない = 得点対象ではないのでスルー
+		} else {
+			isuConditionInsertQueueMutex.Lock()
+			latestIsuConditionMapMutex.Lock()
+			isuConditionInsertQueue = append(isuConditionInsertQueue, IsuConditionInsertJob{
+				JiaIsuUUID: jiaIsuUUID,
+				Timestamp:  timestamp,
+				IsSitting:  cond.IsSitting,
+				Condition:  cond.Condition,
+				Message:    cond.Message,
+			})
+			latestIsuConditionMap[jiaIsuUUID] = cond.Condition
+			latestIsuConditionMapMutex.Unlock()
+			isuConditionInsertQueueMutex.Unlock()
+		}
 	}
 
 	return c.NoContent(http.StatusAccepted)
