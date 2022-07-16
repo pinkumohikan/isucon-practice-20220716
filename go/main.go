@@ -398,7 +398,7 @@ func postInitialize(c echo.Context) error {
 		c.Logger().Error(err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
-	
+
 	c.Response().Header().Set(echo.HeaderContentType, echo.MIMEApplicationJSONCharsetUTF8)
 	c.Response().WriteHeader(http.StatusOK)
 	return c.JSON(http.StatusOK, InitializeResponse{
@@ -784,7 +784,7 @@ func getIsuIcon(c echo.Context) error {
 	}
 
 	var filename string
-	if useDefaultImage {
+	if !useDefaultImage {
 		filename = fmt.Sprintf("/icon/%s.jpg", jiaIsuUUID)
 	} else {
 		filename = iconImagePath + "/icon/NoImage.jpg"
