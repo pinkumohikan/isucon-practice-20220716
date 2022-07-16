@@ -1,0 +1,5 @@
+frontend/src/components/*
+go/isucondition
+public/assets/*i
+sql/1_InitData.sql
+ec256-public.pem
