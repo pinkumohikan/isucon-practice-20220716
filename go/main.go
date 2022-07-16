@@ -62,14 +62,15 @@ type Config struct {
 }
 
 type Isu struct {
-	ID         int       `db:"id" json:"id"`
-	JIAIsuUUID string    `db:"jia_isu_uuid" json:"jia_isu_uuid"`
-	Name       string    `db:"name" json:"name"`
-	Image      []byte    `db:"image" json:"-"`
-	Character  string    `db:"character" json:"character"`
-	JIAUserID  string    `db:"jia_user_id" json:"-"`
-	CreatedAt  time.Time `db:"created_at" json:"-"`
-	UpdatedAt  time.Time `db:"updated_at" json:"-"`
+	ID              int       `db:"id" json:"id"`
+	JIAIsuUUID      string    `db:"jia_isu_uuid" json:"jia_isu_uuid"`
+	Name            string    `db:"name" json:"name"`
+	Image           []byte    `db:"image" json:"-"`
+	UseDefaultImage bool      `db:"use_default_image" json:"-"`
+	Character       string    `db:"character" json:"character"`
+	JIAUserID       string    `db:"jia_user_id" json:"-"`
+	CreatedAt       time.Time `db:"created_at" json:"-"`
+	UpdatedAt       time.Time `db:"updated_at" json:"-"`
 }
 
 type IsuFromJIA struct {
@@ -392,6 +393,14 @@ func postInitialize(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
+	_, err = db.Exec("ALTER TABLE isu ADD COLUMN use_default_image BOOLEAN NOT NULL DEFAULT FALSE")
+	if err != nil {
+		c.Logger().Error(err)
+		return c.NoContent(http.StatusInternalServerError)
+	}
+	
+	c.Response().Header().Set(echo.HeaderContentType, echo.MIMEApplicationJSONCharsetUTF8)
+	c.Response().WriteHeader(http.StatusOK)
 	return c.JSON(http.StatusOK, InitializeResponse{
 		Language: "go",
 	})
@@ -607,8 +616,6 @@ func postIsu(c echo.Context) error {
 		useDefaultImage = true
 	}
 
-	var image []byte
-
 	if !useDefaultImage {
 		file, err := fh.Open()
 		if err != nil {
@@ -639,8 +646,8 @@ func postIsu(c echo.Context) error {
 	defer tx.Rollback()
 
 	_, err = tx.Exec("INSERT INTO `isu`"+
-		"	(`jia_isu_uuid`, `name`, `image`, `jia_user_id`) VALUES (?, ?, ?, ?)",
-		jiaIsuUUID, isuName, image, jiaUserID)
+		"	(`jia_isu_uuid`, `name`, `use_default_image`, `jia_user_id`) VALUES (?, ?, ?, ?)",
+		jiaIsuUUID, isuName, useDefaultImage, jiaUserID)
 	if err != nil {
 		mysqlErr, ok := err.(*mysql.MySQLError)
 
@@ -764,8 +771,8 @@ func getIsuIcon(c echo.Context) error {
 
 	jiaIsuUUID := c.Param("jia_isu_uuid")
 
-	var image []byte
-	err = db.Get(&image, "SELECT `image` FROM `isu` WHERE `jia_user_id` = ? AND `jia_isu_uuid` = ?",
+	var useDefaultImage bool
+	err = db.Get(&useDefaultImage, "SELECT `use_default_image` FROM `isu` WHERE `jia_user_id` = ? AND `jia_isu_uuid` = ?",
 		jiaUserID, jiaIsuUUID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -777,7 +784,7 @@ func getIsuIcon(c echo.Context) error {
 	}
 
 	var filename string
-	if len(image) > 0 {
+	if useDefaultImage {
 		filename = fmt.Sprintf("/icon/%s.jpg", jiaIsuUUID)
 	} else {
 		filename = iconImagePath + "/icon/NoImage.jpg"
