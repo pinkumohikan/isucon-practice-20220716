@@ -97,14 +97,6 @@ type IsuCondition struct {
 
 type IsuAndLastCondition struct {
 	IsuID                  int
-	JIAIsuUUID             string
-	Name                   string
-	Image                  []byte
-	UseDefaultImage        bool
-	Character              string
-	JIAUserID              string
-	IsuCreatedAt           time.Time
-	UpdatedAt              time.Time
 	IsuConditionID         int
 	IsuConditionJIAIsuUUID string
 	Timestamp              time.Time
@@ -1197,7 +1189,7 @@ func getTrend(c echo.Context) error {
 			"SELECT * FROM `isu` WHERE `character` = ?",
 			character.Character,
 		)
-		rows, err := db.Queryx("SELECT isu.*, isu_condition.* FROM `isu` LEFT JOIN `isu_condition` ON isu.jia_isu_uuid = isu_condition.jia_isu_uuid WHERE isu.character = ? GROUP BY isu.jia_isu_uuid HAVING MAX(timestamp)")
+		rows, err := db.Queryx("SELECT isu.id, isu_condition.* FROM `isu` LEFT JOIN `isu_condition` ON isu.jia_isu_uuid = isu_condition.jia_isu_uuid WHERE isu.character = ? GROUP BY isu.jia_isu_uuid HAVING MAX(timestamp)")
 		if err != nil {
 			c.Logger().Errorf("db error: %v", err)
 			return c.NoContent(http.StatusInternalServerError)
@@ -1209,23 +1201,13 @@ func getTrend(c echo.Context) error {
 		characterCriticalIsuConditions := []*TrendCondition{}
 		for rows.Next() {
 			var isuLastCon IsuAndLastCondition
+			var isuId int
 			err = rows.StructScan(&isuLastCon)
 			if err != nil {
 				c.Logger().Errorf("db error: %v", err)
 				return c.NoContent(http.StatusInternalServerError)
 			}
-			targetIsu := Isu{
-				isuLastCon.IsuID,
-				isuLastCon.JIAIsuUUID,
-				isuLastCon.Name,
-				isuLastCon.Image,
-				isuLastCon.UseDefaultImage,
-				isuLastCon.Character,
-				isuLastCon.JIAUserID,
-				isuLastCon.IsuCreatedAt,
-				isuLastCon.UpdatedAt,
-			}
-			isuList = append(isuList, targetIsu)
+			isuId = isuLastCon.IsuID
 
 			isuLastCondition := IsuCondition{
 				isuLastCon.IsuConditionID,
@@ -1242,7 +1224,7 @@ func getTrend(c echo.Context) error {
 				return c.NoContent(http.StatusInternalServerError)
 			}
 			trendCondition := TrendCondition{
-				ID:        targetIsu.ID,
+				ID:        isuId,
 				Timestamp: isuLastCondition.Timestamp.Unix(),
 			}
 			switch conditionLevel {
