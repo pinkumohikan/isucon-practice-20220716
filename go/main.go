@@ -1184,12 +1184,7 @@ func getTrend(c echo.Context) error {
 	res := []TrendResponse{}
 
 	for _, character := range characterList {
-		isuList := []Isu{}
-		err = db.Select(&isuList,
-			"SELECT * FROM `isu` WHERE `character` = ?",
-			character.Character,
-		)
-		rows, err := db.Queryx("SELECT isu.id, isu_condition.* FROM `isu` LEFT JOIN `isu_condition` ON isu.jia_isu_uuid = isu_condition.jia_isu_uuid WHERE isu.character = ? GROUP BY isu.jia_isu_uuid HAVING MAX(timestamp)")
+		rows, err := db.Queryx("SELECT isu.id, isu_condition.* FROM `isu` LEFT JOIN `isu_condition` ON isu.jia_isu_uuid = isu_condition.jia_isu_uuid WHERE isu.character = ? GROUP BY isu.jia_isu_uuid HAVING MAX(timestamp)", character.Character)
 		if err != nil {
 			c.Logger().Errorf("db error: %v", err)
 			return c.NoContent(http.StatusInternalServerError)
