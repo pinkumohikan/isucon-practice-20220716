@@ -1205,6 +1205,8 @@ func InsertIsuConditionWorker(bulkLimit int) {
 				log.Print("ERROR", err)
 				break
 			}
+
+			log.Printf("InsertIsuConditionWorker(): proceeded %d records", len(records))
 		}
 
 		time.Sleep(sleepInterval)
