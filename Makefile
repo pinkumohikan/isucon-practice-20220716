@@ -27,7 +27,7 @@ truncate-logs:
 	ssh isucon111q-03 "sudo truncate --size 0 /var/log/mysql/mysql-slow.log"
 
 bench:
-	cd ../bench && ./bench -all-addresses 127.0.0.11 -target 127.0.0.11:443 -tls -jia-service-url http://127.0.0.1:4999
+	cd ../bench && ./bench -all-addresses 127.0.0.11,192.168.0.31,192.168.0.21 -target 127.0.0.11:443 -tls -jia-service-url http://192.168.0.41:4999
 
 kataribe:
 	sudo cat /var/log/nginx/access.log | ./kataribe -conf kataribe.toml | grep --after-context 20 "Top 20 Sort By Total"
