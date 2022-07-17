@@ -1181,7 +1181,7 @@ func getTrend(c echo.Context) error {
 
 	for _, character := range characterList {
 		isuLastConList := []IsuAndLastCondition{}
-		err := db.Select(&isuLastConList, "SELECT isu.id, isu_condition.jia_isu_uuid, isu_condition.timestamp, isu_condition.condition FROM isu INNER JOIN ( SELECT jia_isu_uuid, MAX(timestamp) as timestamp, `condition` FROM isu_condition GROUP BY jia_isu_uuid ) as isu_condition ON isu.jia_isu_uuid = isu_condition.jia_isu_uuid JOIN isu_condition as co ON isu_condition.timestamp = co.timestamp AND isu_condition.jia_isu_uuid = co.jia_isu_uuid WHERE isu.character = 'いじっぱり'", character.Character)
+		err := db.Select(&isuLastConList, "SELECT isu.id, isu_condition.jia_isu_uuid, isu_condition.timestamp, isu_condition.condition FROM isu INNER JOIN ( SELECT jia_isu_uuid, MAX(timestamp) as timestamp, `condition` FROM isu_condition GROUP BY jia_isu_uuid ) as isu_condition ON isu.jia_isu_uuid = isu_condition.jia_isu_uuid JOIN isu_condition as co ON isu_condition.timestamp = co.timestamp AND isu_condition.jia_isu_uuid = co.jia_isu_uuid WHERE isu.character = ?", character.Character)
 		if err != nil {
 			c.Logger().Errorf("db error: %v", err)
 			return c.NoContent(http.StatusInternalServerError)
