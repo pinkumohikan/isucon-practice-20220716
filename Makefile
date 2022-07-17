@@ -7,6 +7,7 @@ build:
 
 stop-services:
 	sudo systemctl stop nginx
+	sudo systemctl stop varnish
 	sudo systemctl stop isucondition.go
 	ssh isucon111q-03 "sudo systemctl stop isucondition.go"
 	ssh isucon111q-02 "sudo systemctl stop mysql"
@@ -17,6 +18,7 @@ start-services:
 	sudo systemctl start isucondition.go
 	scp ./go/isucondition isucon111q-03:/home/isucon/webapp/go/isucondition
 	ssh isucon111q-03 "sudo systemctl start isucondition.go"
+	sudo systemctl start varnish
 	sudo systemctl start nginx
 
 truncate-logs:
