@@ -542,56 +542,23 @@ func getIsuList(c echo.Context) error {
 	}
 	defer tx.Rollback()
 
-	isuList := []Isu{}
+	var formattedConditionList []*GetIsuListResponse
 	err = tx.Select(
-		&isuList,
-		"SELECT * FROM `isu` WHERE `jia_user_id` = ? ORDER BY `id` DESC",
+		&formattedConditionList,
+		"select isu.id, isu.jia_isu_uuid, isu.name, isu.character ,co.jia_isu_uuid, isu.name, co.timestamp, co.is_sitting, co.condition, co.condition_level, co.message from isu inner join (select MAX(timestamp) as timestamp, jia_isu_uuid   from isu_condition   group by jia_isu_uuid ) as isu_condition on isu.jia_isu_uuid = isu_condition.jia_isu_uuid join isu_condition as co on isu_condition.timestamp = co.timestamp and isu_condition.jia_isu_uuid = co.jia_isu_uuid  where isu.jia_user_id = ?",
 		jiaUserID)
 	if err != nil {
 		c.Logger().Errorf("db error: %v", err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
-
 	responseList := []GetIsuListResponse{}
-	for _, isu := range isuList {
-		var lastCondition IsuCondition
-		foundLastCondition := true
-		err = tx.Get(&lastCondition, "SELECT * FROM `isu_condition` WHERE `jia_isu_uuid` = ? ORDER BY `timestamp` DESC LIMIT 1",
-			isu.JIAIsuUUID)
-		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				foundLastCondition = false
-			} else {
-				c.Logger().Errorf("db error: %v", err)
-				return c.NoContent(http.StatusInternalServerError)
-			}
-		}
-
-		var formattedCondition *GetIsuConditionResponse
-		if foundLastCondition {
-			conditionLevel, err := calculateConditionLevel(lastCondition.Condition)
-			if err != nil {
-				c.Logger().Error(err)
-				return c.NoContent(http.StatusInternalServerError)
-			}
-
-			formattedCondition = &GetIsuConditionResponse{
-				JIAIsuUUID:     lastCondition.JIAIsuUUID,
-				IsuName:        isu.Name,
-				Timestamp:      lastCondition.Timestamp.Unix(),
-				IsSitting:      lastCondition.IsSitting,
-				Condition:      lastCondition.Condition,
-				ConditionLevel: conditionLevel,
-				Message:        lastCondition.Message,
-			}
-		}
-
+	for _, formattedCondition := range formattedConditionList {
 		res := GetIsuListResponse{
-			ID:                 isu.ID,
-			JIAIsuUUID:         isu.JIAIsuUUID,
-			Name:               isu.Name,
-			Character:          isu.Character,
-			LatestIsuCondition: formattedCondition}
+			ID:                 formattedCondition.ID,
+			JIAIsuUUID:         formattedCondition.JIAIsuUUID,
+			Name:               formattedCondition.Name,
+			Character:          formattedCondition.Character,
+			LatestIsuCondition: formattedCondition.LatestIsuCondition}
 		responseList = append(responseList, res)
 	}
 
