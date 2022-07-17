@@ -96,14 +96,10 @@ type IsuCondition struct {
 }
 
 type IsuAndLastCondition struct {
-	IsuID                  int
-	IsuConditionID         int
-	IsuConditionJIAIsuUUID string
-	Timestamp              time.Time
-	IsSitting              bool
-	Condition              string
-	Message                string
-	IsuConditionCreatedAt  time.Time
+	IsuID                  int       `db:"id"`
+	IsuConditionJIAIsuUUID string    `db:"jia_isu_uuid"`
+	Timestamp              time.Time `db:"timestamp"`
+	Condition              string    `db:"condition"`
 }
 
 type MySQLConnectionEnv struct {
@@ -1195,24 +1191,11 @@ func getTrend(c echo.Context) error {
 		characterWarningIsuConditions := []*TrendCondition{}
 		characterCriticalIsuConditions := []*TrendCondition{}
 		for rows.Next() {
-			var isuId int
 			var isuLastCon IsuAndLastCondition
 			err = rows.StructScan(&isuLastCon)
 			if err != nil {
 				c.Logger().Errorf("db error: %v", err)
 				return c.NoContent(http.StatusInternalServerError)
-			}
-			isuId = isuLastCon.IsuID
-
-			isuLastCon = IsuAndLastCondition{
-				isuLastCon.IsuID,
-				isuLastCon.IsuConditionID,
-				isuLastCon.IsuConditionJIAIsuUUID,
-				isuLastCon.Timestamp,
-				isuLastCon.IsSitting,
-				isuLastCon.Condition,
-				isuLastCon.Message,
-				isuLastCon.IsuConditionCreatedAt,
 			}
 			conditionLevel, err := calculateConditionLevel(isuLastCon.Condition)
 			if err != nil {
@@ -1220,7 +1203,7 @@ func getTrend(c echo.Context) error {
 				return c.NoContent(http.StatusInternalServerError)
 			}
 			trendCondition := TrendCondition{
-				ID:        isuId,
+				ID:        isuLastCon.IsuID,
 				Timestamp: isuLastCon.Timestamp.Unix(),
 			}
 			switch conditionLevel {
