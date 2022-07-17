@@ -1,2 +1,2 @@
 ALTER TABLE isu_condition ADD COLUMN condition_level VARCHAR(255) AS (CASE (LENGTH(`condition`) - LENGTH(REPLACE(`condition`, "=true", ''))) / LENGTH("=true") WHEN 0 THEN "info" WHEN 1 THEN "warning" WHEN 2 THEN "warning" WHEN 3 THEN "critical" END) STORED;
-ALTER TABLE isu_condition ADD INDEX (condition_level);
+CREATE INDEX idx_jia_isu_uuid_timestamp ON isu_condition (jia_isu_uuid, timestamp, condition_level);
